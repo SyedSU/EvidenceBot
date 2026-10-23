@@ -1,0 +1,32 @@
+{
+  "repository": "SyedSU/EvidenceBot",
+  "product": "EvidenceBot",
+  "sourceCommit": "bfe88a965a0ba87f5e2a7551affa7c43f2a28166",
+  "runId": 39922798644,
+  "release": {
+    "id": 421592577,
+    "tag": "review-evidencebot-bfe88a965a0ba87f5e2a7551affa7c43f2a28166-39922798644-1"
+  },
+  "assets": [
+    {
+      "name": "EvidenceBot-Windows-x64-review.zip",
+      "size": 38008089,
+      "sha256": "sha256:5d8260ff1cc7786c6924418a5c7850e2fc7bfb9b73de58fe7fe54b9ead631a44"
+    },
+    {
+      "name": "package-report.json",
+      "size": 1485,
+      "sha256": "sha256:cf87438fc0500885886c121eba93e888c0e40569037caf96fbe5b14d9bc8e207"
+    },
+    {
+      "name": "review-build.json",
+      "size": 1003,
+      "sha256": "sha256:9f7e034b90c52429750948b6369214dae1e853c53c0194f57aa486b8beeaf610"
+    },
+    {
+      "name": "windows-smoke.log",
+      "size": 109,
+      "sha256": "sha256:46c7cc5e3b97a423a83d3d7f67287db86cdad4c41ff2ec27bf5a22047c484834"
+    }
+  ]
+}
