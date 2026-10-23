@@ -21,7 +21,7 @@ run(['--editor','--import','--quit'],'Godot Engine')
 server=http.server.HTTPServer(('127.0.0.1',18081),Fixture)
 threading.Thread(target=server.serve_forever,daemon=True).start()
 try:
- for name in ['domain_test','corrupt_test','ui_test','local_fixture_test']:run(['--script','res://tests/'+name+'.gd'],'PASS ')
+ for name in ['domain_test','corrupt_test','ui_test','local_fixture_test','google_test','google_provider_test']:run(['--script','res://tests/'+name+'.gd'],'PASS ')
  run(['--quit-after','3'],'Godot Engine')
 finally:server.shutdown();server.server_close()
 print('BOT COMPLETE ISOLATED SOURCE SUITE PASS')

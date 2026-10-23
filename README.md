@@ -15,7 +15,7 @@ State lives in Godot's separate `EvidenceBot` user directory as inspectable JSON
 
 ## Required scope still blocked
 
-- Gmail and Calendar OAuth, secure OS token storage, provider authorization and confirmed send/insert flows require real reviewed client credentials and provider integration. No connection, mail send or event insertion is implemented or represented as successful.
+- Desktop Gmail/Calendar OAuth PKCE and confirmed send/insert code is implemented. **Live provider acceptance is UNRUN**, blocked on owner-supplied installed desktop client credentials and an explicitly authorized test account. Android OAuth and secure OS token storage remain unimplemented. Desktop credentials/tokens are memory-only; restarting disconnects locally. No provider requests were executed during development.
 - Android opt-in accessibility requires a real service, device permission and device validation. No service or device actions are implemented.
 - Voice activation, Windows execution validation, touch/device acceptance, accessibility review, signed release packaging and target-device performance remain unaccepted. The native UI provides clear unavailable status for provider/device capabilities.
 
@@ -23,8 +23,16 @@ These are required programme deliverables, not removed scope. There are no fake 
 
 ## Verification
 
-`python scripts/test_native.py /path/to/Godot_v4.7.2-stable_linux.x86_64` runs all four native suites. The Python standard-library server is an explicitly synthetic loopback fixture, and app dispatch tests use a synthetic callable. Tests never open Windows apps or contact Gmail/Calendar/devices.
+`python scripts/test_native.py /path/to/Godot_v4.7.2-stable_linux.x86_64` runs all six native suites. The Python standard-library server is an explicitly synthetic loopback fixture, and app dispatch tests use a synthetic callable. Tests never open Windows apps or contact Gmail/Calendar/devices.
 
 The 2026-10-23 Linux session passed: activation; explicit permission and app-bound confirmation; replay rejection; revocation; canceled late answer rejection; restart with no executable pending actions; stale writer rejection; corrupt preservation/blocking; native scene startup/platform guard; real HTTP loopback fixture proving malicious answer text remains plain text. A native headless main-scene startup also passed. These do not constitute Windows/device/provider acceptance.
 
 Copied persistence provenance: exact first-party files from EvidenceGenesis `c6a172a` (`native/durability/*`, `native/durability.gdextension`, `native/scripts/save_files.gd`, `scripts/build_save_adapter.py`). The pinned Godot ABI header hash and retained MIT notice remain in the build script and `native/durability`; no new runtime framework or third-party binding was adopted.
+
+## Desktop Google integration (live acceptance UNRUN)
+
+Load your own Google **installed desktop** client JSON in the masked field, opt in for this session, activate EvidenceBot, then explicitly press Sign in with Google. Only that button opens the browser. OAuth uses the fixed official Google authorization/token endpoints, S256 PKCE, random state, a one-use bounded loopback callback at `127.0.0.1` on an ephemeral port, and only `gmail.send` plus `calendar.events.owned`. Client configuration and access tokens never enter audit, exports or saves. No refresh token is requested or persisted; expiry requires signing in again. Local disconnection/restart does **not** revoke Google's authorization. The separate revoke button requests Google token revocation and reports unconfirmed outcomes honestly; review the Google account's third-party access page if no token remains.
+
+Gmail accepts one typed recipient, subject and plain text body. Calendar creates a UTC event in the primary calendar with no attendees and `sendUpdates=none`. Each preview binds an unpredictable one-use ID and SHA-256 payload snapshot; confirmation consumes it and saves audit intent before HTTP. Requests use fixed HTTPS API endpoints, certificate verification, zero redirects and bounded timeout/body. No automatic retries occur. Cancellation, timeout or connection loss after POST can mean **outcome UNKNOWN**: inspect Google before trying again; cancellation cannot undo an accepted send/event. The audit records only action type/outcome and time, never message/event content or credentials.
+
+The new native suites prove the RFC7636 PKCE vector, callback state/duplicate/path/method/time/body bounds and consumption, UTF-8 MIME validation, UTC events, binding/replay/revocation, stale-audit refusal before dispatch and synthetic HTTP completion/unknown outcomes. The injected synthetic transport is unit evidence, **not real Google acceptance**. No tests open a browser, launch providers or use actual credentials. Android OAuth, accessibility, voice, packaging/signing and device/provider acceptance remain required and blocked; no equivalence is claimed.

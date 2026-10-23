@@ -8,6 +8,9 @@ func run():
 	assert(scene.status.text.contains("Ready"))
 	assert(scene.assistant.state.permissions=={"apps":false,"local_ai":false})
 	assert(not scene.assistant.active)
+	assert(scene.google != null and not scene.google.connected())
+	assert(scene.google_client.secret)
+	assert(scene.google_confirmation != null)
 	assert(scene.answer.editable==false)
 	scene.preview("calculator")
 	assert(not scene.confirmation.visible) # Linux: never launch native apps

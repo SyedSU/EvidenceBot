@@ -11,7 +11,19 @@ var http:HTTPRequest
 var ticket=-1
 var confirmation:ConfirmationDialog
 var selected={}
+var google=preload("res://scripts/google_provider.gd").new()
+var google_client:LineEdit
+var google_preview_text:TextEdit
+var google_confirmation:ConfirmationDialog
+var google_selected={}
+var gmail_to:LineEdit
+var gmail_subject:LineEdit
+var gmail_body:TextEdit
+var event_summary:LineEdit
+var event_start:LineEdit
+var event_end:LineEdit
 func _ready():
+	add_child(google);google.assistant=assistant
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var theme_resource=Theme.new()
 	theme_resource.default_font_size=18
@@ -28,7 +40,7 @@ func _ready():
 		var control=CheckBox.new();control.text="Allow Windows app opening" if permission=="apps" else "Allow local Q&A requests (loopback only)"
 		box.add_child(control)
 		control.toggled.connect(func(enabled):cancel_request();if not assistant.grant(permission,enabled):show_status(assistant.error))
-	button(box,"Revoke all permissions and cancel",func():cancel_request();assistant.grant("apps",false);assistant.grant("local_ai",false);for child in box.get_children():
+	button(box,"Revoke all permissions and cancel",func():cancel_request();google.revoke_local();assistant.grant("apps",false);assistant.grant("local_ai",false);for child in box.get_children():
 		if child is CheckBox:child.set_pressed_no_signal(false)
 	)
 	label(box,"Local OpenAI-compatible server · HTTP 127.0.0.1 only. No cloud fallback. No API keys.")
@@ -39,7 +51,33 @@ func _ready():
 	button(box,"Cancel pending question / action",func():cancel_request();show_status("Canceled; late responses ignored"))
 	answer=TextEdit.new();answer.editable=false;answer.custom_minimum_size.y=140;answer.placeholder_text="Model answers are untrusted text, never commands or actions.";box.add_child(answer)
 	for app in ["calculator","notepad"]:button(box,"Preview opening "+app,func():preview(app))
-	label(box,"Gmail and Calendar: unavailable. Requires reviewed OAuth client credentials, secure token storage, provider scopes and confirmed live integration. No mail or events are sent.")
+	label(box,"Google desktop OAuth · live provider acceptance UNRUN. Supply your own installed desktop client JSON. Tokens and client configuration stay in memory; restart disconnects locally. Google authorization persists until revoked in Google account permissions.")
+	google_client=LineEdit.new();google_client.secret=true;google_client.placeholder_text="Paste installed desktop OAuth client JSON (never saved)";box.add_child(google_client)
+	button(box,"Load client into memory",func():google.configure(google_client.text);google_client.clear())
+	var google_permission=CheckBox.new();google_permission.text="Allow this session: Gmail send and events in calendars I own";box.add_child(google_permission)
+	google_permission.toggled.connect(func(enabled):
+		if not enabled:google.revoke_local()
+		else:google.allowed=true
+	)
+	button(box,"Sign in with Google (opens browser)",func():if not google.sign_in():show_status("Activate, load desktop client, and enable Google permission first"))
+	button(box,"Disconnect locally and cancel Google action",func():google.revoke_local();google_permission.set_pressed_no_signal(false))
+	button(box,"Revoke Google session token and disconnect",func():google.revoke_google();google_permission.set_pressed_no_signal(false))
+	var google_status=label(box,google.outcome)
+	google.changed.connect(func(value):google_status.text=value)
+	label(box,"Gmail: one typed recipient, subject and plain text body. Preview and separately confirm each send. Model output cannot trigger actions.")
+	gmail_to=field(box,"Recipient email address")
+	gmail_subject=field(box,"Subject (maximum 200 characters)")
+	gmail_body=TextEdit.new();gmail_body.placeholder_text="Plain text message (maximum 20,000 characters)";gmail_body.custom_minimum_size.y=120;box.add_child(gmail_body)
+	button(box,"Preview Gmail send",func():preview_google("gmail",{"to":gmail_to.text,"subject":gmail_subject.text,"body":gmail_body.text}))
+	label(box,"Calendar: primary calendar only; UTC start/end; no attendees or invitations (sendUpdates=none).")
+	event_summary=field(box,"Event summary")
+	event_start=field(box,"UTC start: 2026-11-01T10:00:00Z")
+	event_end=field(box,"UTC end: 2026-11-01T11:00:00Z")
+	button(box,"Preview Calendar event",func():preview_google("calendar",{"summary":event_summary.text,"start":event_start.text,"end":event_end.text}))
+	google_confirmation=ConfirmationDialog.new();google_confirmation.title="Confirm one Google action";google_confirmation.ok_button_text="Confirm this exact action once";add_child(google_confirmation)
+	google_preview_text=TextEdit.new();google_preview_text.editable=false;google_preview_text.custom_minimum_size=Vector2(650,320);google_confirmation.add_child(google_preview_text)
+	google_confirmation.confirmed.connect(func():google.confirm(google_selected.get("id"),google_selected.get("digest"));google_selected={})
+	google_confirmation.canceled.connect(func():google.pending={};google_selected={})
 	label(box,"Android accessibility: unavailable. Requires an Android service, explicit device permission and per-action review. No accessibility service is active.")
 	button(box,"Inspect / export audit",export_audit)
 	label(box,"Recovery: JSON and .backup in the EvidenceBot user folder. Corrupt saves are preserved and block actions. Close instances, archive originals, then restore a known backup manually.")
@@ -55,7 +93,8 @@ func button(parent,text_value,action):
 	var node=Button.new();node.text=text_value;node.custom_minimum_size.y=44;node.pressed.connect(action);parent.add_child(node)
 func show_status(value):status.text=value
 func cancel_request():
-	assistant.cancel();selected={}
+	assistant.cancel();selected={};google.cancel_action();google_selected={}
+	if google_confirmation!=null:google_confirmation.hide()
 	if http!=null:
 		http.cancel_request();http.queue_free();http=null
 	if confirmation!=null:confirmation.hide()
@@ -95,3 +134,14 @@ func export_audit():
 	if file==null:show_status("Export failed");return
 	file.store_string(answer.text);file.close()
 	show_status("Inspectable JSON: "+ProjectSettings.globalize_path(target)+" · no questions, answers or secrets stored")
+
+func field(parent,placeholder):
+	var control=LineEdit.new();control.placeholder_text=placeholder;parent.add_child(control);return control
+func preview_google(kind,fields):
+	cancel_request()
+	google_selected=google.preview(kind,fields)
+	if google_selected.is_empty():show_status("Google action blocked: activate, connect and check typed fields");return
+	google_confirmation.dialog_text="Send one Gmail message?" if kind=="gmail" else "Create one event in your primary calendar? No attendees or invitations."
+	google_confirmation.dialog_text+="\nAfter sending, cancellation cannot undo a provider action. Interrupted outcomes may be UNKNOWN; check Google before trying again."
+	google_preview_text.text=JSON.stringify(google_selected.fields,"  ")+"\nConfirmation: "+google_selected.id+"\nSHA-256: "+google_selected.digest
+	google_confirmation.popup_centered(Vector2i(720,500))
