@@ -36,6 +36,24 @@ func _initialize():
 	p.operation="gmail";var generation=p.request_generation;p.revoke_local();p.operation="token"
 	p.completed(HTTPRequest.RESULT_SUCCESS,200,[],JSON.stringify({"access_token":"synthetic","expires_in":3600,"token_type":"Bearer","scope":p.Protocol.SCOPES}).to_utf8_buffer(),generation)
 	assert(p.access_token.is_empty())
+	# Interrupted send uncertainty must survive revoke-all, token revocation and reconfiguration.
+	p.operation="gmail";p.cancel_action();p.revoke_local()
+	assert("UNKNOWN" in p.outcome,"Revoke-all hid interrupted send uncertainty")
+	p.access_token="synthetic";p.expires=Time.get_ticks_msec()+60000;p.allowed=true;p.operation="calendar"
+	p.transport=func(_url,_headers,_body):return OK
+	assert(p.revoke_google())
+	p.completed(HTTPRequest.RESULT_SUCCESS,200,[],PackedByteArray())
+	assert("UNKNOWN" in p.outcome,"Token revocation hid interrupted Calendar outcome")
+	assert(p.configure('{"installed":{"client_id":"sample.apps.googleusercontent.com"}}'))
+	assert("UNKNOWN" in p.outcome,"Reconfiguration hid interrupted action")
+	# Generic Cancel terminates loopback authorization and invalidates late token completion.
+	p.server=TCPServer.new();assert(p.server.listen(0,"127.0.0.1")==OK)
+	p.protocol.begin(p.server.get_local_port(),int(Time.get_ticks_msec()/1000))
+	p.cancel_action();assert(p.server==null and p.protocol.oauth_state.is_empty())
+	p.operation="token";generation=p.request_generation
+	p.cancel_action();assert(p.operation.is_empty())
+	p.completed(HTTPRequest.RESULT_SUCCESS,200,[],JSON.stringify({"access_token":"synthetic","expires_in":3600,"token_type":"Bearer","scope":p.Protocol.SCOPES}).to_utf8_buffer(),generation)
+	assert(p.access_token.is_empty())
 	p.operation="";p.queue_free()
 	print("PASS synthetic Google transport: activation, disconnected default, digest binding, durable intent, consumption, response, local revocation")
 	quit()

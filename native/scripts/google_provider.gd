@@ -16,8 +16,12 @@ var buffer=""
 var peer_deadline=0
 var operation=""
 var request_generation=0
+var unresolved_action=false
 func connected():return allowed and not access_token.is_empty() and Time.get_ticks_msec()<expires
-func status(value):outcome=value;changed.emit(value)
+func status(value):
+	outcome=value
+	if unresolved_action and not "UNKNOWN" in outcome:outcome+=" · Previous provider action outcome UNKNOWN; check Google before any new attempt"
+	changed.emit(outcome)
 func configure(raw):
 	revoke_local()
 	var ok=protocol.configure(raw)
@@ -86,6 +90,7 @@ func completed(result,code,_headers,body,response_generation=-1):
 	var op=operation;operation=""
 	if op.is_empty():return
 	if result!=HTTPRequest.RESULT_SUCCESS:
+		if op in ["gmail","calendar"]:unresolved_action=true
 		status("Outcome UNKNOWN; check Google before any new attempt" if op in ["gmail","calendar","revoke"] else "Authorization transport failed; disconnected");return
 	if op=="token":
 		var value=JSON.parse_string(body.get_string_from_utf8())
@@ -99,13 +104,16 @@ func completed(result,code,_headers,body,response_generation=-1):
 	if op=="revoke":status("Google token revocation accepted" if code==200 else "Google revocation not confirmed; review Google account permissions");return
 	var data=JSON.parse_string(body.get_string_from_utf8())
 	var accepted=code>=200 and code<300 and data is Dictionary and data.get("id") is String
+	if not accepted:unresolved_action=true
 	status("Provider accepted request" if accepted else "Provider response did not confirm acceptance; check Google before any new attempt")
 	assistant.record("google_"+op+("_accepted" if accepted else "_unconfirmed"))
 func revoke_local():
 	request_generation+=1
 	pending={};allowed=false;access_token="";expires=0;stop_listener();protocol.clear()
 	if http!=null:http.cancel_request();http.queue_free();http=null
-	var unknown=operation in ["gmail","calendar","revoke"];operation=""
+	var unknown=operation in ["gmail","calendar","revoke"]
+	if operation in ["gmail","calendar"]:unresolved_action=true
+	operation=""
 	status("Local access cleared; outcome UNKNOWN, check Google" if unknown else "Local access cleared; Google authorization may persist")
 func revoke_google():
 	var token=access_token
@@ -116,7 +124,15 @@ func revoke_google():
 	status("Local access cleared; requesting Google token revocation");return true
 func cancel_action():
 	pending={}
-	if operation not in ["gmail","calendar"]:return
+	var op=operation
+	var authorizing=server!=null or op=="token"
+	if op not in ["gmail","calendar","token"] and not authorizing:return
 	request_generation+=1
+	stop_listener();protocol.oauth_state="";protocol.verifier="";protocol.deadline=0
 	if http!=null:http.cancel_request();http.queue_free();http=null
-	operation="";status("Outcome UNKNOWN after cancellation; check Google before any new attempt")
+	operation=""
+	if op in ["gmail","calendar"]:
+		unresolved_action=true;status("Outcome UNKNOWN after cancellation; check Google before any new attempt")
+	elif authorizing:
+		access_token="";expires=0
+		status("Authorization canceled; disconnected. Google authorization may persist")
