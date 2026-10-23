@@ -23,6 +23,7 @@ var event_summary:LineEdit
 var event_start:LineEdit
 var event_end:LineEdit
 func _ready():
+	if "--package-smoke" in OS.get_cmdline_user_args():call_deferred("_package_review_smoke")
 	add_child(google);google.assistant=assistant
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var theme_resource=Theme.new()
@@ -145,3 +146,7 @@ func preview_google(kind,fields):
 	google_confirmation.dialog_text+="\nAfter sending, cancellation cannot undo a provider action. Interrupted outcomes may be UNKNOWN; check Google before trying again."
 	google_preview_text.text=JSON.stringify(google_selected.fields,"  ")+"\nConfirmation: "+google_selected.id+"\nSHA-256: "+google_selected.digest
 	google_confirmation.popup_centered(Vector2i(720,500))
+
+func _package_review_smoke():
+	var smoke=preload("res://package_smoke.gd").new()
+	await smoke.run(get_tree())
