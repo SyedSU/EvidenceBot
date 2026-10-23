@@ -1,0 +1,32 @@
+extends SceneTree
+func _initialize():
+	var script=load("res://scripts/assistant.gd")
+	if script==null:push_error("Assistant domain missing");quit(1);return
+	var a=script.new()
+	a.path="user://synthetic-test-"+str(Time.get_ticks_usec())+".json"
+	assert(a.start())
+	assert(not a.activate("hello"))
+	assert(a.activate("EvidenceBot"))
+	assert(a.preview("calculator").is_empty())
+	assert(a.grant("apps",true))
+	var p=a.preview("calculator")
+	assert(not p.is_empty())
+	assert(not a.confirm(p.id,"notepad",func(_x):return true))
+	assert(a.confirm(p.id,"calculator",func(_x):return true))
+	assert(not a.confirm(p.id,"calculator",func(_x):return true))
+	p=a.preview("notepad")
+	assert(a.grant("apps",false))
+	assert(not a.confirm(p.id,"notepad",func(_x):return true))
+	assert(a.grant("local_ai",true))
+	var ticket=a.begin_question("hello")
+	assert(ticket>0)
+	a.cancel()
+	assert(not a.accept_answer(ticket,"late"))
+	assert(a.grant("apps",true))
+	p=a.preview("calculator")
+	var b=script.new();b.path=a.path;assert(b.start())
+	assert(b.pending.is_empty())
+	assert(not b.confirm(p.id,"calculator",func(_x):return true))
+	assert(not a.grant("apps",false)) # stale writer
+	print("PASS synthetic dispatcher: activation, binding, revoke, replay, late result, restart, stale writer")
+	quit()

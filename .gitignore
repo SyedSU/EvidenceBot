@@ -1,0 +1,5 @@
+.godot/
+*.so
+*.dll
+*.dylib
+__pycache__/
